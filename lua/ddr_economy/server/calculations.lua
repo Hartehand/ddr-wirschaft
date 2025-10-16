@@ -15,6 +15,7 @@ end
 
 function Calculations:GetPopulationBreakdown()
     local total, unemployed, civilians, stateEmployees = 0, 0, 0, 0
+    local ministryCounts = DREcon.Config:CreateMinistryCountMap()
 
     for _, ply in ipairs(player.GetHumans()) do
         if not IsValid(ply) then continue end
@@ -29,13 +30,19 @@ function Calculations:GetPopulationBreakdown()
         else
             unemployed = unemployed + 1
         end
+
+        local ministryKey = DREcon.Config:GetPlayerMinistry(ply)
+        if ministryKey and ministryCounts[ministryKey] then
+            ministryCounts[ministryKey] = ministryCounts[ministryKey] + 1
+        end
     end
 
     return {
         total = total,
         unemployed = unemployed,
         civilians = civilians,
-        stateEmployees = stateEmployees
+        stateEmployees = stateEmployees,
+        ministryEmployees = ministryCounts
     }
 end
 

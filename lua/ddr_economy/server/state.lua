@@ -75,10 +75,17 @@ function State:Broadcast(target)
     net.WriteDouble(self.Data.priceMultiplier or 1)
 
     local population = self.Data.population or {}
-    net.WriteUInt(population.total or 0, 10)
-    net.WriteUInt(population.unemployed or 0, 10)
-    net.WriteUInt(population.civilians or 0, 10)
-    net.WriteUInt(population.stateEmployees or 0, 10)
+    net.WriteUInt(math.Clamp(population.total or 0, 0, 1023), 10)
+    net.WriteUInt(math.Clamp(population.unemployed or 0, 0, 1023), 10)
+    net.WriteUInt(math.Clamp(population.civilians or 0, 0, 1023), 10)
+    net.WriteUInt(math.Clamp(population.stateEmployees or 0, 0, 1023), 10)
+
+    local ministryCounts = population.ministryEmployees or {}
+    net.WriteUInt(table.Count(ministryCounts), 8)
+    for key, count in pairs(ministryCounts) do
+        net.WriteString(key)
+        net.WriteUInt(math.Clamp(count or 0, 0, 1023), 10)
+    end
 
     local history = self:GetHistory(12)
     net.WriteUInt(#history, 8)

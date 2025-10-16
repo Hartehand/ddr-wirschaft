@@ -37,11 +37,12 @@ Config.CivilianJobs = {
 
 Config.BasicJob = "TEAM_HOBO"
 
+-- Jede Kategorie verweist auf Einträge aus StateJobs oder CivilianJobs; "teams" erlaubt zusätzliche Jobbefehle.
 Config.Ministries = {
     finance = {
         name = "Ministerium für Finanzen",
         key = "finance",
-        employees = 5,
+        categories = { "finance_minister" },
         defaultBudget = 15000,
         efficiency = 0.85,
         corruption = 0.05
@@ -49,7 +50,7 @@ Config.Ministries = {
     defense = {
         name = "Verteidigungsministerium",
         key = "defense",
-        employees = 20,
+        categories = { "military" },
         defaultBudget = 45000,
         efficiency = 0.8,
         corruption = 0.12
@@ -57,7 +58,7 @@ Config.Ministries = {
     interior = {
         name = "Ministerium des Innern",
         key = "interior",
-        employees = 25,
+        categories = { "police" },
         defaultBudget = 38000,
         efficiency = 0.9,
         corruption = 0.08
@@ -65,7 +66,7 @@ Config.Ministries = {
     health = {
         name = "Gesundheitsministerium",
         key = "health",
-        employees = 15,
+        categories = { "health" },
         defaultBudget = 32000,
         efficiency = 0.95,
         corruption = 0.04
@@ -73,7 +74,8 @@ Config.Ministries = {
     industry = {
         name = "Ministerium für Schwerindustrie",
         key = "industry",
-        employees = 40,
+        categories = { "workers" },
+        teams = { "TEAM_FACTORY" },
         defaultBudget = 50000,
         efficiency = 0.7,
         corruption = 0.15
@@ -220,6 +222,79 @@ function Config:GetPlayerIdentifier(ply)
     end
 
     return string.upper(tostring(ply:Team()))
+end
+
+function Config:CreateMinistryCountMap()
+    local counts = {}
+    for key in pairs(self.Ministries or {}) do
+        counts[key] = 0
+    end
+    return counts
+end
+
+local function ResolveCategoryEntry(config, category)
+    if not category then return nil end
+    if isstring(category) then
+        if config.StateJobs and config.StateJobs[category] then
+            return config.StateJobs[category]
+        end
+        if config.CivilianJobs and config.CivilianJobs[category] then
+            return config.CivilianJobs[category]
+        end
+        return nil
+    end
+
+    if istable(category) then
+        return category
+    end
+
+    return nil
+end
+
+function Config:IsMinistryMember(ply, ministry)
+    if not IsValid(ply) or not ministry then return false end
+
+    local identifier = self:GetPlayerIdentifier(ply)
+    if ministry.teams and self:MatchesTeam(identifier, ministry.teams) then
+        return true
+    end
+
+    local categories = ministry.categories or {}
+    for _, category in ipairs(categories) do
+        local entry = ResolveCategoryEntry(self, category)
+        if entry and self:IsInCategory(ply, { entry }) then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Config:GetPlayerMinistry(ply)
+    if not IsValid(ply) then return nil end
+
+    for key, ministry in pairs(self.Ministries or {}) do
+        if self:IsMinistryMember(ply, ministry) then
+            return key, ministry
+        end
+    end
+
+    return nil
+end
+
+function Config:CountMinistryEmployees()
+    local counts = self:CreateMinistryCountMap()
+
+    for _, ply in ipairs(player.GetHumans()) do
+        if IsValid(ply) then
+            local key = self:GetPlayerMinistry(ply)
+            if key and counts[key] then
+                counts[key] = counts[key] + 1
+            end
+        end
+    end
+
+    return counts
 end
 
 DREcon.Config = Config

@@ -5,7 +5,7 @@ Dieses Repository enthält ein modulares Lua-System, das eine umfangreiche Staat
 ## Module
 
 - `lua/autorun/ddr_economy_init.lua` – Initialisiert das Wirtschaftssystem auf Server und Client.
-- `lua/ddr_economy/shared/config.lua` – Konfiguration von Teams, Ministerien, Basiswerten und Shop-Angeboten.
+- `lua/ddr_economy/shared/config.lua` – Konfiguration von Teams, Ministerien (inkl. dynamischer Mitarbeiterzählung), Basiswerten und Shop-Angeboten.
 - `lua/ddr_economy/server/state.lua` – Persistenter Staatszustand, Speicherung und Netztwerk-Synchronisation.
 - `lua/ddr_economy/server/calculations.lua` – Periodische Wirtschaftsberechnungen (BIP, Inflation, Defizit usw.).
 - `lua/ddr_economy/server/taxes.lua` – Verwaltung von Steuersätzen, Budgets, Krediten und Shoppreisen.
@@ -23,6 +23,7 @@ Dieses Repository enthält ein modulares Lua-System, das eine umfangreiche Staat
 
 - Realistische, aber performante Berechnungen von Inflation, BIP, Arbeitslosenquote und Defizit.
 - Ministeriumsbudgets inklusive Effizienz, Korruption und deren Auswirkungen auf die Wirtschaft.
+- Automatische Ermittlung der tatsächlichen Mitarbeiterzahlen pro Ministerium anhand der aktuellen Spielerjobs.
 - Steuerverwaltung (Einkommen-, Unternehmens- und Umsatzsteuer) direkt über das GUI.
 - Kreditaufnahme, Schuldentilgung und Budgettransfers zwischen Ministerien.
 - Staatlicher Shop mit automatischer Preissteigerung und Schulden-bedingten Sperren für Luxusgüter.

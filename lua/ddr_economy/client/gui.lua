@@ -95,9 +95,10 @@ function GUI:BuildBudgetTab(parent)
 
     local list = vgui.Create("DListView", panel)
     list:SetPos(10, 10)
-    list:SetSize(260, 260)
+    list:SetSize(320, 260)
     list:AddColumn("Ministerium")
     list:AddColumn("Budget")
+    list:AddColumn("Mitarbeiter")
     self.BudgetList = list
     function list:OnRowSelected(index, line)
         if not IsValid(amountEntry) then return end
@@ -106,12 +107,12 @@ function GUI:BuildBudgetTab(parent)
     end
 
     local amountEntry = vgui.Create("DTextEntry", panel)
-    amountEntry:SetPos(280, 10)
+    amountEntry:SetPos(340, 10)
     amountEntry:SetSize(120, 24)
     amountEntry:SetPlaceholderText("Betrag")
 
     local updateButton = vgui.Create("DButton", panel)
-    updateButton:SetPos(280, 40)
+    updateButton:SetPos(340, 40)
     updateButton:SetSize(120, 24)
     updateButton:SetText("Setzen")
     updateButton.DoClick = function()
@@ -127,7 +128,7 @@ function GUI:BuildBudgetTab(parent)
     end
 
     local transferFrom = vgui.Create("DComboBox", panel)
-    transferFrom:SetPos(280, 80)
+    transferFrom:SetPos(340, 80)
     transferFrom:SetSize(120, 24)
     transferFrom:SetValue("Von")
     transferFrom.OnSelect = function(_, _, _, data)
@@ -135,7 +136,7 @@ function GUI:BuildBudgetTab(parent)
     end
 
     local transferTo = vgui.Create("DComboBox", panel)
-    transferTo:SetPos(280, 110)
+    transferTo:SetPos(340, 110)
     transferTo:SetSize(120, 24)
     transferTo:SetValue("Nach")
     transferTo.OnSelect = function(_, _, _, data)
@@ -148,13 +149,13 @@ function GUI:BuildBudgetTab(parent)
     self.TransferToKey = nil
 
     local transferAmount = vgui.Create("DTextEntry", panel)
-    transferAmount:SetPos(280, 140)
+    transferAmount:SetPos(340, 140)
     transferAmount:SetSize(120, 24)
     transferAmount:SetPlaceholderText("Betrag")
     self.TransferAmount = transferAmount
 
     local transferButton = vgui.Create("DButton", panel)
-    transferButton:SetPos(280, 170)
+    transferButton:SetPos(340, 170)
     transferButton:SetSize(120, 24)
     transferButton:SetText("Übertragen")
     transferButton.DoClick = function()
@@ -339,9 +340,14 @@ function GUI:Refresh()
         self.BudgetList:Clear()
         for key, ministry in pairs(DREcon.Config.Ministries or {}) do
             local budget = state.ministryBudgets and state.ministryBudgets[key] or ministry.defaultBudget
-            local line = self.BudgetList:AddLine(ministry.name or key, FormatMoney(budget))
+            local employees = 0
+            if state.population and state.population.ministryEmployees then
+                employees = state.population.ministryEmployees[key] or 0
+            end
+            local line = self.BudgetList:AddLine(ministry.name or key, FormatMoney(budget), tostring(employees))
             line.ministryKey = key
             line.budgetValue = budget
+            line.employeeCount = employees
         end
     end
 
@@ -407,6 +413,14 @@ net.Receive("drecon_state_update", function()
         civilians = net.ReadUInt(10),
         stateEmployees = net.ReadUInt(10)
     }
+
+    local ministryCount = net.ReadUInt(8)
+    local ministryEmployees = {}
+    for _ = 1, ministryCount do
+        local key = net.ReadString()
+        ministryEmployees[key] = net.ReadUInt(10)
+    end
+    state.population.ministryEmployees = ministryEmployees
 
     state.history = {}
     local historyCount = net.ReadUInt(8)
