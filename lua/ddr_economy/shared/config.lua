@@ -3,23 +3,31 @@ DREcon = DREcon or {}
 local Config = {}
 
 Config.StorageFile = "drecon_state.json"
-Config.PeriodSeconds = 600 -- 10 minutes by default
-Config.BaseInterestRate = 0.015
-Config.InflationDebtThreshold = 500000
-Config.InflationBase = 0.01
-Config.InflationDebtModifier = 0.000002
-Config.InflationSpendingModifier = 0.0005
-Config.DefaultConsumption = 1500
-Config.DefaultInvestment = 2000
-Config.DefaultPrivateIncome = 2200
-Config.UnemploymentPenalty = 0.5
-Config.TaxSmoothing = 0.5
-Config.PriceInflationSensitivity = 0.5
-Config.DebtCrisisThreshold = 1500000
-Config.CrisisInflationShock = 0.03
-Config.CrisisGDPDrop = 0.15
-Config.CrisisUnemploymentIncrease = 0.08
+Config.PeriodSeconds = 600
 Config.GUIRefresh = 10
+
+Config.InactivitySeconds = 600
+Config.ActivityGraceSeconds = 120
+Config.BaseInterestRate = 0.01
+Config.InterestDebtWeight = 0.00000045
+Config.InterestInflationWeight = 0.35
+Config.InflationBase = 0.01
+Config.InflationPersistence = 0.4
+Config.InflationWeights = {
+    money = 0.55,
+    deficit = 0.25,
+    demand = 0.2
+}
+Config.PriceInflationSensitivity = 0.45
+Config.ProductivityPerWorker = 1200
+Config.PropertyTaxRate = 0.04
+Config.PrinterImpactWeight = 0.5
+Config.SecurityPenalties = {
+    arrest = 0.0025,
+    death = 0.0015,
+    lockdown = 0.06,
+    wanted = 0.0012
+}
 
 Config.StateJobs = {
     finance_minister = { teams = { "TEAM_FINANCEMINISTER", "TEAM_MINFIN" } },
@@ -37,13 +45,12 @@ Config.CivilianJobs = {
 
 Config.BasicJob = "TEAM_HOBO"
 
--- Jede Kategorie verweist auf Einträge aus StateJobs oder CivilianJobs; "teams" erlaubt zusätzliche Jobbefehle.
 Config.Ministries = {
     finance = {
         name = "Ministerium für Finanzen",
         key = "finance",
         categories = { "finance_minister" },
-        defaultBudget = 15000,
+        defaultBudget = 0,
         efficiency = 0.85,
         corruption = 0.05
     },
@@ -51,7 +58,7 @@ Config.Ministries = {
         name = "Verteidigungsministerium",
         key = "defense",
         categories = { "military" },
-        defaultBudget = 45000,
+        defaultBudget = 0,
         efficiency = 0.8,
         corruption = 0.12
     },
@@ -59,7 +66,7 @@ Config.Ministries = {
         name = "Ministerium des Innern",
         key = "interior",
         categories = { "police" },
-        defaultBudget = 38000,
+        defaultBudget = 0,
         efficiency = 0.9,
         corruption = 0.08
     },
@@ -67,7 +74,7 @@ Config.Ministries = {
         name = "Gesundheitsministerium",
         key = "health",
         categories = { "health" },
-        defaultBudget = 32000,
+        defaultBudget = 0,
         efficiency = 0.95,
         corruption = 0.04
     },
@@ -76,7 +83,7 @@ Config.Ministries = {
         key = "industry",
         categories = { "workers" },
         teams = { "TEAM_FACTORY" },
-        defaultBudget = 50000,
+        defaultBudget = 0,
         efficiency = 0.7,
         corruption = 0.15
     }
@@ -106,43 +113,40 @@ Config.MinistryShop = {
 }
 
 Config.DefaultState = {
-    treasury = 350000,
-    debt = 600000,
-    gdp = 1200000,
-    inflation = 0.02,
-    unemployment = 0.1,
+    treasury = 0,
+    debt = 0,
+    gdp = 0,
+    inflation = Config.InflationBase,
+    unemployment = 0,
     taxRates = {
-        income = 0.25,
-        corporate = 0.2,
-        sales = 0.1
+        income = 0.2,
+        corporate = 0.18,
+        sales = 0.12
     },
     ministryBudgets = {},
     deficit = 0,
     interestRate = Config.BaseInterestRate,
-    history = {}
+    history = {},
+    moneySupply = 0,
+    gdpComponents = { consumption = 0, investment = 0, government = 0 },
+    revenueBreakdown = {},
+    spendingBreakdown = {},
+    lawStats = {},
+    sources = {}
 }
+
+function Config:CreateDefaultState()
+    local state = table.Copy(self.DefaultState)
+    state.ministryBudgets = self:ResolveMinistryBudgets()
+    return state
+end
 
 function Config:ResolveMinistryBudgets()
     local budgets = {}
     for key, ministry in pairs(self.Ministries) do
-        budgets[key] = ministry.defaultBudget
+        budgets[key] = ministry.defaultBudget or 0
     end
     return budgets
-end
-
-function Config:MatchesTeam(teamValue, list)
-    if not list then return false end
-    local identifier = self:ResolveTeamIdentifier(teamValue)
-    if not identifier then return false end
-
-    for _, entry in ipairs(list) do
-        local entryIdentifier = self:ResolveTeamIdentifier(entry)
-        if entryIdentifier == identifier then
-            return true
-        end
-    end
-
-    return false
 end
 
 function Config:ResolveTeamIdentifier(teamValue)
@@ -168,43 +172,23 @@ function Config:ResolveTeamIdentifier(teamValue)
     return string.upper(tostring(teamValue))
 end
 
-function Config:IsFinanceMinister(ply)
-    if not IsValid(ply) then return false end
-    if ply.IsSuperAdmin and ply:IsSuperAdmin() then return true end
-    return self:IsInCategory(ply, { self.StateJobs.finance_minister })
-end
-
-function Config:IsBasicJob(ply)
-    return self:MatchesTeam(self:GetPlayerIdentifier(ply), { self.BasicJob })
-end
-
-function Config:IsStateEmployee(ply)
-    for _, data in pairs(self.StateJobs) do
-        if self:IsInCategory(ply, { data }) and data ~= self.StateJobs.finance_minister then
-            return true
-        end
+function Config:FormatMoney(value)
+    if DarkRP and DarkRP.formatMoney then
+        return DarkRP.formatMoney(value)
     end
-    return false
+
+    return string.format("%0.2f", value or 0)
 end
 
-function Config:IsCivilian(ply)
-    for _, data in pairs(self.CivilianJobs) do
-        if self:IsInCategory(ply, { data }) then
+function Config:MatchesTeam(teamValue, list)
+    if not list then return false end
+    local identifier = self:ResolveTeamIdentifier(teamValue)
+    if not identifier then return false end
+
+    for _, entry in ipairs(list) do
+        local entryIdentifier = self:ResolveTeamIdentifier(entry)
+        if entryIdentifier == identifier then
             return true
-        end
-    end
-    return false
-end
-
-function Config:IsInCategory(ply, categories)
-    if not IsValid(ply) then return false end
-    local identifier = self:GetPlayerIdentifier(ply)
-
-    for _, category in ipairs(categories) do
-        for _, teamName in ipairs(category.teams or {}) do
-            if self:ResolveTeamIdentifier(teamName) == identifier then
-                return true
-            end
         end
     end
 
@@ -224,14 +208,6 @@ function Config:GetPlayerIdentifier(ply)
     return string.upper(tostring(ply:Team()))
 end
 
-function Config:CreateMinistryCountMap()
-    local counts = {}
-    for key in pairs(self.Ministries or {}) do
-        counts[key] = 0
-    end
-    return counts
-end
-
 local function ResolveCategoryEntry(config, category)
     if not category then return nil end
     if isstring(category) then
@@ -249,6 +225,49 @@ local function ResolveCategoryEntry(config, category)
     end
 
     return nil
+end
+
+function Config:IsInCategory(ply, categories)
+    if not IsValid(ply) then return false end
+    local identifier = self:GetPlayerIdentifier(ply)
+
+    for _, category in ipairs(categories) do
+        for _, teamName in ipairs(category.teams or {}) do
+            if self:ResolveTeamIdentifier(teamName) == identifier then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+function Config:IsFinanceMinister(ply)
+    if not IsValid(ply) then return false end
+    if ply.IsSuperAdmin and ply:IsSuperAdmin() then return true end
+    return self:IsInCategory(ply, { self.StateJobs.finance_minister })
+end
+
+function Config:IsBasicJob(ply)
+    return self:MatchesTeam(self:GetPlayerIdentifier(ply), { self.BasicJob })
+end
+
+function Config:IsStateEmployee(ply)
+    for key, data in pairs(self.StateJobs) do
+        if key ~= "finance_minister" and self:IsInCategory(ply, { data }) then
+            return true
+        end
+    end
+    return false
+end
+
+function Config:IsCivilian(ply)
+    for _, data in pairs(self.CivilianJobs) do
+        if self:IsInCategory(ply, { data }) then
+            return true
+        end
+    end
+    return false
 end
 
 function Config:IsMinistryMember(ply, ministry)
@@ -282,19 +301,110 @@ function Config:GetPlayerMinistry(ply)
     return nil
 end
 
-function Config:CountMinistryEmployees()
-    local counts = self:CreateMinistryCountMap()
+function Config:CreateMinistryCountMap()
+    local counts = {}
+    for key in pairs(self.Ministries or {}) do
+        counts[key] = 0
+    end
+    return counts
+end
+
+function Config:GetActivityKey(ply)
+    if not IsValid(ply) then return nil end
+    return ply:SteamID64() or ply:SteamID()
+end
+
+function Config:BuildPopulationSnapshot(activityMap, inactivitySeconds)
+    inactivitySeconds = inactivitySeconds or self.InactivitySeconds
+    local now = CurTime()
+
+    local total = 0
+    local unemployed = 0
+    local civilians = 0
+    local stateEmployees = 0
+    local inactive = 0
+    local ministryCounts = self:CreateMinistryCountMap()
 
     for _, ply in ipairs(player.GetHumans()) do
-        if IsValid(ply) then
-            local key = self:GetPlayerMinistry(ply)
-            if key and counts[key] then
-                counts[key] = counts[key] + 1
-            end
+        if not IsValid(ply) then continue end
+        total = total + 1
+
+        local isState = self:IsStateEmployee(ply) or self:IsFinanceMinister(ply)
+        local isCivilian = self:IsCivilian(ply) and not isState
+        local activityKey = self:GetActivityKey(ply)
+        local lastActivity = activityMap and activityMap[activityKey] or 0
+        local inactiveFor = now - lastActivity
+        local isInactive = inactiveFor > inactivitySeconds
+
+        local baseUnemployed = self:IsBasicJob(ply) or (not isState and not isCivilian)
+        local isUnemployed = baseUnemployed or isInactive
+
+        if isUnemployed then
+            unemployed = unemployed + 1
+        end
+        if isCivilian then
+            civilians = civilians + 1
+        end
+        if isState then
+            stateEmployees = stateEmployees + 1
+        end
+        if isInactive then
+            inactive = inactive + 1
+        end
+
+        local ministryKey = self:GetPlayerMinistry(ply)
+        if ministryKey and ministryCounts[ministryKey] then
+            ministryCounts[ministryKey] = ministryCounts[ministryKey] + 1
         end
     end
 
-    return counts
+    return {
+        total = total,
+        unemployed = math.min(unemployed, total),
+        civilians = civilians,
+        stateEmployees = stateEmployees,
+        inactive = inactive,
+        ministryEmployees = ministryCounts
+    }
+end
+
+function Config:ComputeInterestRate(state, gdp)
+    state = state or {}
+    local debt = state.debt or 0
+    local inflation = state.inflation or self.InflationBase
+    local gdpScale = math.max(gdp or state.gdp or 1, 1)
+
+    return self.BaseInterestRate
+        + (debt / gdpScale) * self.InterestDebtWeight
+        + (inflation * self.InterestInflationWeight)
+end
+
+function Config:ComputeSecurityDrag(lawStats)
+    lawStats = lawStats or {}
+    local drag = 0
+
+    drag = drag + (lawStats.arrests or 0) * (self.SecurityPenalties.arrest or 0)
+    drag = drag + (lawStats.deaths or 0) * (self.SecurityPenalties.death or 0)
+    drag = drag + (lawStats.lockdowns or 0) * (self.SecurityPenalties.lockdown or 0)
+    drag = drag + (lawStats.wanted or 0) * (self.SecurityPenalties.wanted or 0)
+
+    return math.Clamp(drag, 0, 0.45)
+end
+
+function Config:ComputeInflation(inputs)
+    local previous = inputs.previous or self.InflationBase
+    local moneyGrowth = inputs.moneyGrowth or 0
+    local deficitRatio = inputs.deficitRatio or 0
+    local demandPressure = inputs.demandPressure or 0
+    local securityPenalty = inputs.securityPenalty or 0
+
+    local inflation = previous * self.InflationPersistence
+    inflation = inflation + moneyGrowth * (self.InflationWeights.money or 0)
+    inflation = inflation + math.max(deficitRatio, 0) * (self.InflationWeights.deficit or 0)
+    inflation = inflation + math.max(demandPressure, 0) * (self.InflationWeights.demand or 0)
+    inflation = inflation + securityPenalty
+
+    return math.max(inflation, 0)
 end
 
 DREcon.Config = Config

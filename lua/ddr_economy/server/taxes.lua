@@ -15,6 +15,10 @@ function Finance:SetTaxRate(ply, taxType, rate)
         data.taxRates[taxType] = rate
     end)
 
+    if DREcon.Metrics and DREcon.Metrics.RecordPolicyChange then
+        DREcon.Metrics:RecordPolicyChange("tax", { type = taxType, rate = rate })
+    end
+
     return true
 end
 
@@ -31,6 +35,10 @@ function Finance:SetBudget(ply, ministryKey, amount)
         data.ministryBudgets[ministryKey] = amount
     end)
 
+    if DREcon.Metrics and DREcon.Metrics.RecordPolicyChange then
+        DREcon.Metrics:RecordPolicyChange("budget", { ministry = ministryKey, amount = amount })
+    end
+
     return true
 end
 
@@ -42,6 +50,10 @@ function Finance:Borrow(ply, amount)
         data.debt = (data.debt or 0) + amount
         data.treasury = (data.treasury or 0) + amount
     end)
+
+    if DREcon.Metrics and DREcon.Metrics.RecordPolicyChange then
+        DREcon.Metrics:RecordPolicyChange("debt", { action = "borrow", amount = amount })
+    end
 
     return true
 end
@@ -61,6 +73,10 @@ function Finance:RepayDebt(ply, amount)
         data.debt = math.max((data.debt or 0) - amount, 0)
         data.treasury = (data.treasury or 0) - amount
     end)
+
+    if DREcon.Metrics and DREcon.Metrics.RecordPolicyChange then
+        DREcon.Metrics:RecordPolicyChange("debt", { action = "repay", amount = amount })
+    end
 
     return true
 end
@@ -83,6 +99,10 @@ function Finance:TransferBudget(ply, fromKey, toKey, amount)
         data.ministryBudgets[fromKey] = math.max((data.ministryBudgets[fromKey] or 0) - amount, 0)
         data.ministryBudgets[toKey] = (data.ministryBudgets[toKey] or 0) + amount
     end)
+
+    if DREcon.Metrics and DREcon.Metrics.RecordPolicyChange then
+        DREcon.Metrics:RecordPolicyChange("budget_transfer", { from = fromKey, to = toKey, amount = amount })
+    end
 
     return true
 end

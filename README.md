@@ -7,7 +7,8 @@ Dieses Repository enthält ein modulares Lua-System, das eine umfangreiche Staat
 - `lua/autorun/ddr_economy_init.lua` – Initialisiert das Wirtschaftssystem auf Server und Client.
 - `lua/ddr_economy/shared/config.lua` – Konfiguration von Teams, Ministerien (inkl. dynamischer Mitarbeiterzählung), Basiswerten und Shop-Angeboten.
 - `lua/ddr_economy/server/state.lua` – Persistenter Staatszustand, Speicherung und Netztwerk-Synchronisation.
-- `lua/ddr_economy/server/calculations.lua` – Periodische Wirtschaftsberechnungen (BIP, Inflation, Defizit usw.).
+- `lua/ddr_economy/server/calculations.lua` – Periodische Wirtschaftsberechnungen auf Basis protokollierter DarkRP-Aktivitäten.
+- `lua/ddr_economy/server/metrics.lua` – Echtzeit-Hooks für Gehaltszahlungen, Käufe, Bußgelder, Geldumlauf u.v.m.
 - `lua/ddr_economy/server/taxes.lua` – Verwaltung von Steuersätzen, Budgets, Krediten und Shoppreisen.
 - `lua/ddr_economy/server/commands.lua` – Chat-/Konsolenbefehle sowie GUI-Aktionsempfänger.
 - `lua/ddr_economy/client/gui.lua` – Derma-GUI für den Finanzminister mit Übersicht, Steuern, Budgets, Schulden, Historie und staatlichem Shop.
@@ -21,13 +22,14 @@ Dieses Repository enthält ein modulares Lua-System, das eine umfangreiche Staat
 
 ## Features
 
-- Realistische, aber performante Berechnungen von Inflation, BIP, Arbeitslosenquote und Defizit.
-- Ministeriumsbudgets inklusive Effizienz, Korruption und deren Auswirkungen auf die Wirtschaft.
-- Automatische Ermittlung der tatsächlichen Mitarbeiterzahlen pro Ministerium anhand der aktuellen Spielerjobs.
-- Steuerverwaltung (Einkommen-, Unternehmens- und Umsatzsteuer) direkt über das GUI.
-- Kreditaufnahme, Schuldentilgung und Budgettransfers zwischen Ministerien.
-- Staatlicher Shop mit automatischer Preissteigerung und Schulden-bedingten Sperren für Luxusgüter.
-- Persistente Speicherung aller Staatsdaten inklusive Verlauf der letzten Perioden.
+- Echtzeitaggregation aller relevanten Kennzahlen ausschließlich aus DarkRP-Hooks (Gehälter, Käufe, Bußgelder, Geldmenge, Arrests, Lockdowns usw.).
+- Periodische BIP-/Inflationsberechnung auf Basis von Konsum, Investitionen und staatlichen Ausgaben, inklusive Geldmengen- und Sicherheitsfaktoren.
+- Ministeriumsbudgets mit Live-Mitarbeiterzählung, Budgetverbrauch, Überziehungen und automatischer Verschuldung bei Unterfinanzierung.
+- Steuerverwaltung (Einkommen, Unternehmen, Umsatz) mit unmittelbarer Auswirkung auf reale Transaktionen und transparenten Quellenangaben.
+- Kreditaufnahme, Schuldentilgung, Budgettransfers und Projektausgaben, jeweils mit Auswirkungen auf Schuldenquote und Staatskasse.
+- Staatlicher Shop mit Inflationsfaktor, Schuldenrestriktionen und konfigurierbaren Items pro Ministerium.
+- Umfangreiche GUI mit Karten, Tabellen, Graphen und Quellenbox für die letzten Perioden (inkl. Geldmengenänderung, Sicherheitslage, BIP-Historie).
+- Persistente Speicherung aller Staatsdaten inklusive Verlauf und rekonstruierbaren Kennzahlen je Periode.
 
 ## Lizenz
 

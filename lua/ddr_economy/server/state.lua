@@ -5,10 +5,17 @@ local State = DREcon.State
 
 function State:Init(config)
     self.Config = config
-    self.Data = self:Load() or table.Copy(config.DefaultState)
+    self.Data = self:Load() or config:CreateDefaultState()
     self.Data.ministryBudgets = self.Data.ministryBudgets or config:ResolveMinistryBudgets()
     self.Data.history = self.Data.history or {}
     self.Data.period = self.Data.period or 0
+    self.Data.gdpComponents = self.Data.gdpComponents or { consumption = 0, investment = 0, government = 0 }
+    self.Data.revenueBreakdown = self.Data.revenueBreakdown or {}
+    self.Data.spendingBreakdown = self.Data.spendingBreakdown or {}
+    self.Data.lawStats = self.Data.lawStats or {}
+    self.Data.sources = self.Data.sources or {}
+    self.Data.moneySupply = self.Data.moneySupply or 0
+    self.Data.moneySupplyGrowth = self.Data.moneySupplyGrowth or 0
     self:Save()
 end
 
@@ -79,12 +86,53 @@ function State:Broadcast(target)
     net.WriteUInt(math.Clamp(population.unemployed or 0, 0, 1023), 10)
     net.WriteUInt(math.Clamp(population.civilians or 0, 0, 1023), 10)
     net.WriteUInt(math.Clamp(population.stateEmployees or 0, 0, 1023), 10)
+    net.WriteUInt(math.Clamp(population.inactive or 0, 0, 1023), 10)
 
     local ministryCounts = population.ministryEmployees or {}
     net.WriteUInt(table.Count(ministryCounts), 8)
     for key, count in pairs(ministryCounts) do
         net.WriteString(key)
         net.WriteUInt(math.Clamp(count or 0, 0, 1023), 10)
+    end
+
+    local gdpComponents = self.Data.gdpComponents or {}
+    net.WriteDouble(gdpComponents.consumption or 0)
+    net.WriteDouble(gdpComponents.investment or 0)
+    net.WriteDouble(gdpComponents.government or 0)
+
+    local revenueBreakdown = self.Data.revenueBreakdown or {}
+    net.WriteDouble(revenueBreakdown.income or 0)
+    net.WriteDouble(revenueBreakdown.corporate or 0)
+    net.WriteDouble(revenueBreakdown.sales or 0)
+    net.WriteDouble(revenueBreakdown.fines or 0)
+    net.WriteDouble(revenueBreakdown.licenses or 0)
+    net.WriteDouble(revenueBreakdown.property or 0)
+    net.WriteDouble(revenueBreakdown.other or 0)
+
+    local spendingBreakdown = self.Data.spendingBreakdown or {}
+    net.WriteDouble(spendingBreakdown.salaries or 0)
+    net.WriteDouble(spendingBreakdown.procurement or 0)
+    net.WriteDouble(spendingBreakdown.welfare or 0)
+    net.WriteDouble(spendingBreakdown.projects or 0)
+    net.WriteDouble(spendingBreakdown.interest or 0)
+    net.WriteDouble(spendingBreakdown.overruns or 0)
+
+    net.WriteDouble(self.Data.moneySupply or 0)
+    net.WriteDouble(self.Data.moneySupplyGrowth or 0)
+
+    local lawStats = self.Data.lawStats or {}
+    net.WriteUInt(math.Clamp(lawStats.arrests or 0, 0, 65535), 16)
+    net.WriteUInt(math.Clamp(lawStats.deaths or 0, 0, 65535), 16)
+    net.WriteUInt(math.Clamp(lawStats.lockdowns or 0, 0, 65535), 16)
+    net.WriteUInt(math.Clamp(lawStats.wanted or 0, 0, 65535), 16)
+
+    local sources = self.Data.sources or {}
+    local sourceCount = math.min(#sources, 32)
+    net.WriteUInt(sourceCount, 6)
+    for i = 1, sourceCount do
+        local entry = sources[i]
+        net.WriteString((entry and entry.title) or "")
+        net.WriteString((entry and entry.detail) or "")
     end
 
     local history = self:GetHistory(12)
@@ -101,6 +149,11 @@ function State:Broadcast(target)
         net.WriteDouble(entry.taxes or 0)
         net.WriteDouble(entry.spending or 0)
         net.WriteDouble(entry.interest or 0)
+        net.WriteDouble(entry.moneySupply or 0)
+        net.WriteDouble(entry.moneySupplyGrowth or 0)
+        net.WriteDouble(entry.consumption or 0)
+        net.WriteDouble(entry.investment or 0)
+        net.WriteDouble(entry.government or 0)
     end
 
     if target then
